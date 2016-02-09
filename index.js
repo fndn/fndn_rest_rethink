@@ -146,7 +146,7 @@ function expose_model(app, conn, prefix, model){
 	});
 
 	// csv export
-	app.get('/csv/' + model, function(req, res){
+	app.get('/pub/csv/' + model, function(req, res){
 		R.run(conn, function(err, cursor){
 			if( err ){
 				res.status(500).json({error:err}).end();
