@@ -14,16 +14,22 @@ var flatKeys 	= require('recursive-keys').dumpKeysRecursively;
 
 
 var default_conf = {
-	db: 			'TEST102',
+	db: 			'test',
 	host: 			'localhost',
 	port: 			28015,
-	collections: 	['locations', 'storeBrands', 'brands', 'products', 'registrations'],
+	collections: 	['users'],
 	http_port: 		9999,
 	post_size_limit:'256mb',
 };
 
-module.exports.init = function( app, conf ){
-	//TODO: merge conf with default conf
+module.exports.init = function( app, _conf ){
+	
+	/// merge conf with default conf
+	var conf = default_conf;
+	Object.keys(_conf).forEach( function(k){
+		conf[k] = _conf[k];
+	});
+	console.log('REST, using conf', conf);
 	
 	_init_express(app, conf);
 
@@ -146,7 +152,7 @@ function expose_model(app, conn, prefix, model){
 	});
 
 	// csv export
-	app.get('/pub/csv/' + model, function(req, res){
+	app.get('/csv/' + model, function(req, res){
 		R.run(conn, function(err, cursor){
 			if( err ){
 				res.status(500).json({error:err}).end();
