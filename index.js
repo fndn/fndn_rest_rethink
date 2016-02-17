@@ -20,6 +20,9 @@ var default_conf = {
 	collections: 	['users'],
 	http_port: 		9999,
 	post_size_limit:'256mb',
+	csv: {
+		//"products": ['id', 'created_at']
+	}
 };
 
 module.exports.init = function( app, _conf ){
@@ -39,13 +42,13 @@ module.exports.init = function( app, _conf ){
 		connection.use(conf.db);
 
 		for(var i in conf.collections){
-			expose_model(app, connection, '/api/', conf.collections[i] );
+			expose_model(app, connection, '/api/', conf.collections[i], conf );
 		}
 	});
 
 }
 
-function expose_model(app, conn, prefix, model){
+function expose_model(app, conn, prefix, model, config){
 	console.log( chalk.green('+ exposing ')+ model +' on '+ prefix + model);
 
 	
@@ -161,6 +164,13 @@ function expose_model(app, conn, prefix, model){
 					
 					var fields = flatKeys( result[0] );
 					console.log('fields', fields);
+
+
+					// order, include and exclude fields based on template, if defined
+					if( config.csv[model] != undefined ){
+						console.log('Using CSV TPL');
+						fields = config.csv[model];
+					}
 
 					//res.csv(result, null, fields, true);
 					json2csv({data:result, fields:fields, flatten:true, defaultValue:'n/a', del:';'}, function(err, csv) {
