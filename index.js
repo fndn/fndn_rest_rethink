@@ -12,6 +12,7 @@ var JSONPH 		= require('json-parse-helpfulerror');
 var json2csv 	= require('json2csv');
 var flatKeys 	= require('recursive-keys').dumpKeysRecursively;
 
+var R, conn; // expose connection to check_duplicates() //FIXME
 
 var default_conf = {
 	db: 			'test',
@@ -42,6 +43,7 @@ module.exports.init = function( app, _conf ){
 		connection.use(conf.db);
 
 		for(var i in conf.collections){
+			conn = connection; // expose connection to check_duplicates() //FIXME
 			expose_model(app, connection, '/api/', conf.collections[i], conf );
 		}
 	});
@@ -68,7 +70,8 @@ function expose_model(app, conn, prefix, model, config){
 	// init routes
 	console.log( chalk.green('+ exposing ')+ model +' on '+ prefix + model);
 
-	var R = r.table(model);
+	//var
+	R = r.table(model);
 
 	/// all
 	app.get(prefix + model, function(req, res){
