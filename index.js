@@ -12,7 +12,6 @@ var JSONPH 		= require('json-parse-helpfulerror');
 var json2csv 	= require('json2csv');
 var flatKeys 	= require('recursive-keys').dumpKeysRecursively;
 
-var R, conn; // expose connection to check_duplicates() //FIXME
 
 var default_conf = {
 	db: 			'test',
@@ -33,7 +32,7 @@ module.exports.init = function( app, _conf ){
 	Object.keys(_conf).forEach( function(k){
 		conf[k] = _conf[k];
 	});
-	console.log('REST, using conf', conf);
+	//console.log('fndn_rest_rethink.conf:', conf);
 	
 	_init_express(app, conf);
 
@@ -43,7 +42,6 @@ module.exports.init = function( app, _conf ){
 		connection.use(conf.db);
 
 		for(var i in conf.collections){
-			conn = connection; // expose connection to check_duplicates() //FIXME
 			expose_model(app, connection, '/api/', conf.collections[i], conf );
 		}
 	});
@@ -70,8 +68,7 @@ function expose_model(app, conn, prefix, model, config){
 	// init routes
 	console.log( chalk.green('+ exposing ')+ model +' on '+ prefix + model);
 
-	//var
-	R = r.table(model);
+	var R = r.table(model);
 
 	/// all
 	app.get(prefix + model, function(req, res){
@@ -104,8 +101,8 @@ function expose_model(app, conn, prefix, model, config){
 	app.post(prefix + model, function(req, res, next){
 		//console.log('R create', req.body);
 
-		checkDuplicates( req.body, function(docs){
-			
+		app._checkDuplicates(req.body, function(docs){
+
 			R.insert( docs, {return_changes:'always', conflict:'update'}).run(conn, function(err, result){
 				if( err ){
 					res.status(500).json({error:err}).end();
@@ -123,25 +120,6 @@ function expose_model(app, conn, prefix, model, config){
 			});
 
 		});
-
-		/*
-		R.insert( req.body, {return_changes:'always', conflict:'update'}).run(conn, function(err, result){
-			
-			if( err ){
-				res.status(500).json({error:err}).end();
-				return;
-			}
-
-			// reply with received IDs only
-			var ids = req.body.map( function(doc){
-				return doc.id;
-			}).filter( function(id){
-				return id.length==10;
-			});
-			
-			res.status(200).json(ids).end();
-		});
-		*/
 	});
 
 	/// diff
@@ -158,7 +136,7 @@ function expose_model(app, conn, prefix, model, config){
 	});
 
 	// csv export
-	app.get('/pub/csv/' + model, function(req, res){
+	app.get('/csv/' + model, function(req, res){
 		R.run(conn, function(err, cursor){
 			if( err ){
 				res.status(500).json({error:err}).end();
@@ -185,6 +163,36 @@ function expose_model(app, conn, prefix, model, config){
 			}
 		});
     });
+
+	app._checkDuplicates = function(_docs, cb){
+		
+		console.log("[app._checkDuplicates] ", count, "array?", isArray(_docs) );
+
+		// docs MUST be an array of objects
+		if( !isArray(_docs) ) return [];
+
+		var docs = [];
+		var count = _docs.length;
+		var i = 0;
+
+		_docs.forEach( function(doc){
+			var simpledoc = omitDeep(doc, ['_id', 'id', 'created_at', 'gps', 'reporter', 'price']);
+			R.filter(simpledoc).count().run(conn, function(err, result){
+				console.log('duplicate ?', result);
+				if( result === 0 ){
+					docs.push(doc);
+				}else{
+					console.log('-> discarding ', simpledoc);
+				}
+				i++;
+				if( i === count ){
+					// done
+					cb(docs);
+				}
+			});
+		});
+	}
+
 }
 
 function _init_rethink(conf, cb){
@@ -253,30 +261,8 @@ function _init_express(app, conf){
 }
 
 /// utils
-
-function checkDuplicates(_docs, cb){ // docs MUST be an array of objects
-	var docs = [];
-	var count = _docs.length;
-	var i = 0;
-
-	console.log("[checkDuplicate] ", count, typeof _docs );
-
-	_docs.forEach( function(doc){
-		var simpledoc = omitDeep(doc, ['_id', 'id', 'created_at', 'gps', 'reporter', 'price']);
-		R.filter(simpledoc).count().run(conn, function(err, result){
-			console.log('duplicate ?', result);
-			if( result === 0 ){
-				docs.push(doc);
-			}else{
-				console.log('-> discarding ', simpledoc);
-			}
-			i++;
-			if( i === count ){
-				// done
-				cb(docs);
-			}
-		});
-	});
+function isArray( a ){
+	return ( Object.prototype.toString.call( a ) === '[object Array]' );
 }
 
 var checkJSON = function(req, res, next){
